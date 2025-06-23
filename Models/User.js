@@ -22,9 +22,16 @@ const UserSchema = mongoose.Schema({
        type : String,
        required : [true, "Password is required"],
     },
+    phone : {
+       type : String,
+       required : [true, "Phone number is required"],
+    },
+    address :{
+        type : String, 
+    },
     role : {
         type : String,
-        enum : ['doctor', 'records', 'laboratory', 'nurse', 'admin', 'receptionist'],
+        enum : ['Admin','Doctor', 'Nurse','Laboratorist', 'Pharmacist', 'Record', 'Accountants', 'Receptionist'],
         required : [true, "Role is required"],
     },
     search : [

@@ -1,4 +1,3 @@
-import bodyParser from "body-parser";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -9,8 +8,8 @@ import dashboard from "./Routes/index.js";
 
 
 const app = express();
-app.use(bodyParser.json({limit:"32mb", extended : true}));
-app.use(bodyParser.urlencoded({limit: "32mb", extended : true}));
+app.use(express.json({limit:"32mb", extended : true}));
+app.use(express.urlencoded({limit: "32mb", extended : true}));
 app.use(cors());
 app.use('/', dashboard);
 

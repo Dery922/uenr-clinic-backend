@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import department from "../Models/Department.js";
+import User
+ from "../Models/User.js";
 const getDepartment = async (req, res) => {
      try {
         const departments = await department.find();
@@ -8,6 +10,8 @@ const getDepartment = async (req, res) => {
         res.status(404).json({error : error});
      }
 }
+
+
 
 const createDepartment =  async (req, res) => {
    const body = req.body;
