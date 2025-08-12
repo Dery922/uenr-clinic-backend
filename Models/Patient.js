@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 
 const PatientSchema = mongoose.Schema({
+    created_by : {
+        type : String,
+    },
     patient_id :{
        type: String, unique : true,
     },
@@ -25,13 +28,25 @@ const PatientSchema = mongoose.Schema({
         type : Number,
         required : [true, "Age is required"]
     },
-    patient_type :{
-        type : String,
-        required : true,
-    },
     insurance : {
         type : String,
         required : [true, " Insurance policie is required"],
+    },
+    insurance_number :{
+         type : Number,
+         default : null,
+    },
+    patient_type :{
+        type : String,
+        required : [true, "Patient type is required"]
+    },
+    course_of_studies :{
+         type : String,
+         default : null,
+    },
+    address :{
+        type : String,
+        required : [true, "Patient address is required"],
     },
     date_of_birth : {
         type : Date,

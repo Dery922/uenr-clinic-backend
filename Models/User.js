@@ -22,6 +22,10 @@ const UserSchema = mongoose.Schema({
        type : String,
        required : [true, "Password is required"],
     },
+    joining_date:{
+        type : Date,
+        default : Date.now,
+    },
     phone : {
        type : String,
        required : [true, "Phone number is required"],
@@ -33,6 +37,23 @@ const UserSchema = mongoose.Schema({
         type : String,
         enum : ['Admin','Doctor', 'Nurse','Laboratorist', 'Pharmacist', 'Record', 'Accountants', 'Receptionist'],
         required : [true, "Role is required"],
+    },
+    license_number : {
+      type : String,
+      default : null,
+    },
+    specialization : {
+        type : String,
+        default : null,
+    },
+    department : {
+        type  : String,
+    
+    },
+    profile_picture : {
+         type : String,
+         default : null,
+    
     },
     search : [
       {

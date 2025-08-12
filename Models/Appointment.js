@@ -5,17 +5,7 @@ import User from "./User.js"
 
 const AppointmentSchema = mongoose.Schema({
 
-     appointment_id : {type :String},
-   //   patient_id : {
-   //      type : mongoose.Schema.Types.ObjectId,
-   //      ref : Patient,
-   //      required : true,
-   //   },
-   //   doctors_id : {
-   //      type : mongoose.Schema.Types.ObjectId,
-   //      ref : User,
-   //      required : true,
-   //   },
+
    patient_name : {
       type : String,
       required : true
@@ -42,12 +32,13 @@ const AppointmentSchema = mongoose.Schema({
      },
      phone : {
       type : String
-      }
-
-     
-
+      },
+      appointment_status : {
+         type : String,
+         
+      },
 }, {
-    timestamp : true
+    timestamps : true
 })
 const Appointment = mongoose.model("Appointment", AppointmentSchema);
 export default Appointment

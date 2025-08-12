@@ -5,7 +5,7 @@ const VisitSchema = new mongoose.Schema({
         type : mongoose.Schema.Types.ObjectId,
         ref : 'Patient',
         required : true
-    },
+    }, 
     visit_date : {
         type : Date,
         default : Date.now

@@ -1,42 +1,59 @@
 import express from "express";
-import mongoose from "mongoose";
+import http from "http";
 import cors from "cors";
-import env from "dotenv/config";
+import dotenv from 'dotenv';
+dotenv.config(); 
+import { Server } from "socket.io";
+import connectDB from "./config/db.js";
 import dashboard from "./Routes/index.js";
-
-
+import Message from "./Models/Message.js";
+import messageHandler, { videoCallHandler } from "./socket/index.js";
+import patientRoutes from "./Routes/patientRoutes.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
 
 const app = express();
-app.use(express.json({limit:"32mb", extended : true}));
-app.use(express.urlencoded({limit: "32mb", extended : true}));
+const server = http.createServer(app);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ✅ Setup Socket.IO with correct CORS
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+    credentials: true,
+  }
+});
+
+// ✅ Middleware
+app.use(express.json());
+app.use(express.urlencoded({ limit: "32mb", extended: true }));
 app.use(cors());
 app.use('/', dashboard);
+app.use('/api/patients', patientRoutes);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 
-const PORTS = process.env.PORT;
-const mongoURL = "mongodb://localhost:27017"
-
-
-
-
-const connectDB = async () => {
-   try {
-     await mongoose.connect(mongoURL);
-     app.listen( PORTS, () => {
-      console.log(`Server started on ${PORTS}`)
-     })
-   } catch (error) {
-     console.log(`Connection to mongodb failed ${error}`);
-   }
-}
-
-
-
-connectDB();
-mongoose.connection.on("open", () => {
-   console.log("Connection to database has been established!");
+io.on('connection', (socket) => {
+  console.log('New user connected');
+  messageHandler(socket, io); // this contains the join handler
+  videoCallHandler(socket, io)
+  socket.on('disconnect', () => {
+    console.log('User disconnected');
+  });
 });
-mongoose.connection.on("error" , (error) => {
-  console.log(error)
+
+
+
+
+
+// ✅ Connect to DB and start server
+connectDB();
+
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });
