@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
 
 const UrineTestSchema = new mongoose.Schema({
+  session: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Session",
+    required: true,
+  },
+  
    patient_id : {
      type : String,
    },

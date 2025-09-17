@@ -2,13 +2,12 @@ import {Router} from "express";
 import { getDepartment } from "../Controllers/department.js";
 import { createDepartment } from "../Controllers/department.js";
 import { createUser, getlogin } from "../Controllers/auth.js";
-import { createPatientLabRecord, createPatientLabUrineRecord, createPatientQuickTestRecord, createPatientRecord, createPatientWardRecord} from "../Controllers/PatientController.js";
+import {  createPatientLabRecord, createPatientLabUrineRecord, createPatientQuickTestRecord, createPatientRecord, createPatientWardRecord, getActiveSession, getOpenSessionsWithPatients, savePhamacyPrescribetion} from "../Controllers/PatientController.js";
 import {createPatientOPDRecord} from "../Controllers/PatientController.js";
 import Message from "../Models/Message.js";
 import { 
   UpdateSubjectiveConsultation,
-  createAppointment, 
-  getDoctors,getAppointmens, 
+  createAppointment,getAppointmens, 
   getOnlineEmployees, 
   getPatients, getAllEmployees, 
   editPatient,
@@ -26,13 +25,21 @@ import {
   addInventory,
   getPatientMed,
   allInventory,
-  getOPDSession} from "../Controllers/GeneralController.js";
+  getOPDSessionView,
+  getPendingPrescriptions,
+  markAsDispensed,
+  searchMedication,
+  processMedicationPayment,
+  getPatientLabHistory,
+  unpaidMedications,
+  getAllPatientRecordWard} from "../Controllers/GeneralController.js";
 import upload from "./upload.js";
 import Imaging from "../Models/Imaging.js";
 import { register, RegisterStudent, StudentLogin } from "../Controllers/AppController.js";
 
 import OPDWard from "../Models/OPDWard.js";
 import { allOutPatients, allPatients, allStudentsPatients, allUsers, getGenderDistribution, getMonthlyPatientStats } from "../Controllers/DashboardController.js";
+import { Session,sessionClose,sessionOpen } from "../Controllers/PatientController.js";
 const router = Router();
 
 
@@ -51,21 +58,20 @@ router.get("/api/patients/gender-distribution", getGenderDistribution);
 //pharmacy
 router.get("/pharmacy/prescription/:patientId", getPatientMed);
 
-router.get("/opd-session-view/:patientId", getOPDSession);
+router.get("/api/inventory/search", searchMedication);
 
 
 // router.get("/", getDashboard);
 router.get("/departments",getDepartment);
 router.get("/api/online-users", getOnlineEmployees);
-router.get("/api/getDoctors", getDoctors);
 router.get("/api/getPatients", getPatients);
-router.get("/api/getPatients/opd-records",getOPDRecords);
+
 router.get("/api/getAppointments", getAppointmens);
 router.get("/api/getEmployees",getAllEmployees);
 router.get("/api/edit-patients/:id", editPatient);
 router.put("/api/edit-patients/:id", updatePatient);
 // router.get("/api/patients/search", searchPatientRecord);
-router.get("/api/all-patient-record-opd-today",getOPDToDay);
+
 router.get("/api/all-patients-prescription",getTodayPrescription);
 router.get("/api/patients/:patientId/medical-records", getSOAPNotes);
 router.get("/api/pending-appointments", getTodayAppointments);
@@ -96,16 +102,42 @@ router.post("/create/departments", createDepartment);
 router.post("/login", getlogin);
 router.post("/createUser", upload.single("profile_picture"), createUser);
 router.post("/create-patient-record", createPatientRecord);
-router.post("/create-patient-opdward-record", createPatientOPDRecord );
+
 router.post("/create-patient-ward-record",  createPatientWardRecord);
 router.post("/create-appointment", createAppointment);
 router.delete("/delete-appointment/:id", deleteAppointment);
 router.put("/update-appointment/:id", updateAppointment);
 router.post("/api/doctor-plan", createDoctorPlan);
 
+router.get("/all-patient-record-ward", getAllPatientRecordWard)
+
+
+router.get("/api/patients/:id/get-all-lab-test", getPatientLabHistory);
 
 
 
+//opd routes here
+router.get("/opd-session-view/:patientId", getOPDSessionView);
+router.get("/api/getPatients/opd-records",getOPDRecords);
+router.post("/create-patient-opdward-record", createPatientOPDRecord );
+router.get("/api/all-patient-record-opd-today",getOPDToDay);
+
+router.post("/save-prescription-info",savePhamacyPrescribetion)
+
+
+//session routes here
+router.post("/create/session", Session);
+router.put("/sessions/:id/close", sessionClose);
+router.post("/open/session", sessionOpen);
+router.get("/active/session",getActiveSession);
+
+//pharmacy routes here
+router.get("/pharmacy/pending/prescription", getPendingPrescriptions);
+// Correct route definition
+router.patch("/pharmacy/dispense/:planId", markAsDispensed);
+// financial records
+router.post("/pharmacy/process-payment", processMedicationPayment);
+router.get("/finance/unpaid-medications", unpaidMedications);
 
 
 // GET /api/messages/:senderId/:receiverId
@@ -145,7 +177,7 @@ router.get("/messages/:senderId/:receiverId", async (req, res) => {
   }
 });
 
-
+ 
 //
 router.patch('/api/opd/complete/:patientId', async (req, res) => {
   try {
@@ -202,7 +234,9 @@ router.post("/api/imaging", upload.single("image"), async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-  
 
+
+// General search route for across the hold app here 
+router.get("/api/display/open-sessions", getOpenSessionsWithPatients);
 
 export default router;

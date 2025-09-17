@@ -1,6 +1,12 @@
 import mongoose from "mongoose"
 
 const WardSchema = mongoose.Schema({
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Session",
+        required: true,
+      },
+      
     patient_id : {
         type: String
      },
@@ -34,6 +40,9 @@ const WardSchema = mongoose.Schema({
     weight :{
         type : Number,
         required : true
+    },
+    note:{
+        type:String,
     },
  
     username :{

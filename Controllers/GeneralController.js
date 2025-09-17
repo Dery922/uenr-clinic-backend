@@ -11,7 +11,13 @@ import Plan from "../Models/Plan.js";
 import StudentPatient from "../Models/StudentPatient.js";
 import BloodTest from "../Models/BloodTest.js";
 import Inventory from "../Models/Inventory.js";
-
+import PatientSession from "../Models/PatientSession.js";
+import FinancialRecord from "../Models/FinancialRecord.js";
+import Notification from "../Models/Notification.js";
+import { io } from "../server.js";
+import UrineTest from "../Models/UrineTest.js";
+import Ward from "../Models/Ward.js";
+import QuickTest from "../Models/QuickTest.js";
 const getOnlineEmployees = async (req, res) => {
   try {
     const onlineUserIds = Array.from(onlineUsers.keys());
@@ -34,30 +40,32 @@ const getAllEmployees = async (req, res) => {
 };
 const getOPDRecords = async (req, res) => {
   try {
-    const patient = await OPDWard.find();
+    const patient = await OPDWard.find().sort({createdAt : -1});
     res.status(200).json(patient);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+//get all patients who are in session
+// Get all patients who are in session, sorted by most recent
 const getOPDToDay = async (req, res) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Start of today (00:00:00)
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1); // Start of next day (00:00:00)
   try {
-    const result = await OPDWard.find({
-      createdAt: {
-        // Replace "createdAt" with your date field
-        $gte: today, // Greater than or equal to today 00:00:00
-        $lt: tomorrow, // Less than tomorrow 00:00:00
-      },
-    });
-    res.status(200).json(result);
+    const opds = await OPDWard.find()
+      .populate({
+        path: "session",
+        match: { status: "open" },
+      })
+      .sort({ createdAt: -1 }); // Sort by most recently created first
+
+    // Filter OPDs that actually have an open session
+    const filteredOpds = opds.filter((opd) => opd.session !== null);
+
+    res.status(200).json(filteredOpds);
+    console.log(filteredOpds);
   } catch (error) {
-    console.log("Internal server error", { error });
+    console.error("Internal server error", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -79,10 +87,6 @@ const getTodayPrescription = async (req, res) => {
   }
 };
 
-const getDoctors = async (req, res) => {
-  try {
-  } catch (error) {}
-};
 const getPatients = async (req, res) => {
   try {
     const patient = await Patient.find();
@@ -134,7 +138,7 @@ const createAppointment = async (req, res) => {
       appointment_status,
     } = req.body;
 
-    const firstAppoint = await new Appointment({
+    const newAppointment = await new Appointment({
       patient_name,
       doctor_name,
       appointment_type,
@@ -146,13 +150,34 @@ const createAppointment = async (req, res) => {
       appointment_status,
     }).save();
 
+    // Save notification to DB
+    await new Notification({
+      doctor_name,
+      message: `New appointment: ${patient_name} on ${appointment_date} at ${appointment_time}`,
+      read: false,
+    }).save();
+
+    // Send email confirmation
     sendAppointmentTime(email, appointment_date, appointment_time);
-    res.status(200).json(firstAppoint);
+
+    // // Emit real-time event if doctor is online
+    // io.emit(`appointment:${doctor_name}`, {
+    //   message: `New appointment for you: ${patient_name} on ${appointment_date} at ${appointment_time}`,
+    //   appointment: newAppointment,
+    // });
+
+    io.to(doctor_name).emit("newNotification", {
+      message: `New appointment for you: ${patient_name} on ${appointment_date} at ${appointment_time}`,
+      appointment: newAppointment,
+    });
+
+    res.status(200).json(newAppointment);
   } catch (error) {
     console.error("Appointment creation error:", error.message);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 const deleteAppointment = async (req, res) => {
   try {
     const { id } = req.params;
@@ -167,8 +192,8 @@ const updateAppointment = async (req, res) => {};
 const DoctorSubjective = async (req, res) => {
   try {
     const {
+      session_id,
       patient_id,
-      patient_name,
       registration_date,
       complaint,
       illness,
@@ -177,19 +202,24 @@ const DoctorSubjective = async (req, res) => {
     } = req.body;
 
     const consult = await new Subjective({
-      patient_id,
-      patient_name,
+      session: session_id, // FIXED
+      patient: patient_id,
       registration_date,
       complaint,
       illness,
       review,
       username,
     }).save();
+
     res.status(200).json(consult);
   } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error" });
+    console.error(error); // <-- Log actual error for debugging
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
+
 const UpdateSubjectiveConsultation = async (req, res) => {
   try {
     const { patientId } = req.params;
@@ -213,8 +243,10 @@ const UpdateSubjectiveConsultation = async (req, res) => {
   }
 };
 const DoctorObjective = async (req, res) => {
+  console.log(req.body)
   try {
     const {
+      session_id,
       patient_id,
       patient_name,
       registration_date,
@@ -226,7 +258,8 @@ const DoctorObjective = async (req, res) => {
     } = req.body;
 
     const consult = await new Objective({
-      patient_id,
+      session: session_id,
+      patient_id: patient_id,
       patient_name,
       registration_date,
       physical_examination,
@@ -243,6 +276,7 @@ const DoctorObjective = async (req, res) => {
 const DoctorAssessment = async (req, res) => {
   try {
     const {
+      session_id,
       patient_id,
       patient_name,
       registration_date,
@@ -252,7 +286,8 @@ const DoctorAssessment = async (req, res) => {
     } = req.body;
 
     const consult = await new Assessment({
-      patient_id,
+      session: session_id,
+      patient_id: patient_id,
       patient_name,
       registration_date,
       differential_diagnosis,
@@ -265,155 +300,407 @@ const DoctorAssessment = async (req, res) => {
   }
 };
 
+// GET /api/pharmacy/prescriptions
+const getPendingPrescriptions = async (req, res) => {
+  try {
+    const prescriptions = await Plan.find({
+      "medications.dispense_status": "pending", // Match your schema
+    })
+      .populate("session") // Optional: populate session if needed
+      .exec();
+
+    res.json(prescriptions);
+
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch prescriptions" });
+  }
+};
+
+// PATCH /api/pharmacy/dispense/:id - CORRECTED VERSION
+const markAsDispensed = async (req, res) => {
+  try {
+    const { planId } = req.params;
+    const { pharmacist_username, drugIndex } = req.body;
+
+    console.log("Dispense request:", {
+      planId,
+      pharmacist_username,
+      drugIndex,
+    });
+
+    // Validate required fields
+    if (!pharmacist_username) {
+      return res.status(400).json({ error: "Pharmacist username is required" });
+    }
+
+    const plan = await Plan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({ error: "Plan not found" });
+    }
+
+    if (!plan.medications || drugIndex >= plan.medications.length) {
+      return res.status(400).json({ error: "Invalid medication index" });
+    }
+
+    const medication = plan.medications[drugIndex];
+
+    // CHECK PAYMENT STATUS BEFORE DISPENSING
+    if (
+      !medication.covered_by_insurance &&
+      medication.payment_status !== "paid"
+    ) {
+      return res.status(402).json({
+        error: "Payment required before dispensing",
+        details: {
+          medication: medication.medication_name,
+          amount: medication.amount,
+          balance: medication.amount - (medication.paid_amount || 0),
+          payment_status: medication.payment_status,
+        },
+        requires_payment: true,
+      });
+    }
+
+    // Check if already dispensed
+    if (medication.dispense_status === "completed") {
+      return res.status(400).json({ error: "Medication already dispensed" });
+    }
+
+    // UPDATE INVENTORY STOCK (if medication came from inventory)
+    if (medication.inventory_id) {
+      await Inventory.findByIdAndUpdate(medication.inventory_id, {
+        $inc: { quantity: -medication.quantity },
+      });
+    }
+
+    // Update medication status
+    medication.dispense_status = "completed";
+    medication.dispensed_by = pharmacist_username;
+    medication.dispensed_at = new Date();
+
+    // Check if all medications are dispensed
+    const allDispensed = plan.medications.every(
+      (med) => med.dispense_status === "completed"
+    );
+
+    if (allDispensed) {
+      plan.status = "dispatched";
+    }
+
+    await plan.save();
+
+    res.json({
+      success: true,
+      message: "Medication dispensed successfully",
+      updatedPlan: plan,
+    });
+  } catch (error) {
+    console.error("Dispense error:", error);
+    res.status(500).json({ error: "Failed to dispense medication" });
+  }
+};
+
+const unpaidMedications = async(req,res) => {
+   
+     try {
+        const getUnpaid = await Plan.find({
+          "medications.payment_status": "pending",
+     })
+
+     res.status(200).json(getUnpaid)
+     } catch (error) {
+       res.status(404).json(error)
+     }
+}
+
+// Process payment for medication
+const processMedicationPayment = async (req, res) => {
+  try {
+    const {
+      planId,
+      drugIndex,
+      amount_paid,
+      payment_method,
+      transaction_id,
+      cashier_username,
+    } = req.body;
+
+    const plan = await Plan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({ error: "Plan not found" });
+    }
+
+    const medication = plan.medications[drugIndex];
+    if (!medication) {
+      return res.status(404).json({ error: "Medication not found" });
+    }
+
+    // Calculate payment details
+    const totalAmount = medication.amount;
+    const paidAmount = amount_paid;
+    const balance = totalAmount - paidAmount;
+
+    // Update medication payment status
+    medication.paid_amount = (medication.paid_amount || 0) + paidAmount;
+
+    if (balance <= 0) {
+      medication.payment_status = "paid";
+      medication.payment_date = new Date();
+      medication.payment_method = payment_method;
+      medication.transaction_id = transaction_id;
+    } else {
+      medication.payment_status = "partial";
+    }
+
+    // Create financial record
+    const financialRecord = new FinancialRecord({
+      patient_id: plan.patient,
+      patient_name: plan.patient_name,
+      plan_id: planId,
+      medication_index: drugIndex,
+      medication_name: medication.medication_name,
+      amount: totalAmount,
+      covered_by_insurance: medication.covered_by_insurance,
+      payment_status: medication.payment_status,
+      paid_amount: paidAmount,
+      balance: balance,
+      payment_date: new Date(),
+      payment_method: payment_method,
+      transaction_id: transaction_id,
+      created_by: cashier_username,
+      department: "pharmacy",
+    });
+
+    await financialRecord.save();
+    await plan.save();
+
+    res.json({
+      success: true,
+      message: "Payment processed successfully",
+      payment_status: medication.payment_status,
+      balance: balance,
+      financial_record: financialRecord,
+    });
+  } catch (error) {
+    console.error("Payment processing error:", error);
+    res.status(500).json({ error: "Failed to process payment" });
+  }
+};
+
 const createDoctorPlan = async (req, res) => {
   try {
-    const newPlan = new Plan(req.body);
-    const savedPlan = await newPlan.save();
-    res
+    const {
+      session,
+      patient, // MRN (string)
+      patient_name,
+      registration_date,
+      patient_education,
+      username,
+      medications = [],
+      tests = [],
+      admission
+    } = req.body;
+
+    // Basic validation (fast feedback)
+    if (
+      !session ||
+      !patient ||
+      !patient_name ||
+      !registration_date ||
+      !username
+    ) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Normalize date
+    const regDate = new Date(registration_date);
+
+    // Normalize medications and set statuses
+    const normalizedMeds = medications.map((m) => {
+      const covered = !!m.covered_by_insurance;
+      return {
+        medication_name: m.medication_name,
+        dose: m.dose,
+        frequency: m.frequency,
+        covered_by_insurance: covered,
+        amount: Number(m.amount || 0),
+        payment_status: covered ? "not_required" : "pending",
+        dispense_status: "pending",
+      };
+    });
+
+    const plan = await Plan.create({
+      session,
+      patient,
+      patient_name,
+      registration_date: regDate,
+      patient_education,
+      username,
+      medications: normalizedMeds,
+      tests,
+      status: "pending",
+      admission:"not-admitted"
+    });
+
+    return res
       .status(201)
-      .json({ message: "Plan saved successfully", data: savedPlan });
+      .json({ message: "Plan saved successfully", data: plan });
   } catch (error) {
     console.error("Error saving plan:", error);
-    res.status(500).json({ error: "Failed to save doctor's plan" });
+    return res.status(500).json({ error: "Failed to save doctor's plan" });
   }
 };
 
 const getSOAPNotes = async (req, res) => {
-  const { patientId } = req.params;
 
   try {
-    // Fetch records from all SOAP models
-    const [subjectives, objectives, assessments, plans] = await Promise.all([
-      Subjective.find({ patient_id: patientId }).lean(),
-      Objective.find({ patient_id: patientId }).lean(),
-      Assessment.find({ patient_id: patientId }).lean(),
-      Plan.find({ patient_id: patientId }).lean()
-    ]);
+    const { patientId } = req.params;
 
-    // If nothing was found at all
-    if (
-      subjectives.length === 0 &&
-      objectives.length === 0 &&
-      assessments.length === 0 &&
-      plans.length === 0
-    ) {
-      return res.status(404).json({ message: "No records found for this patient" });
+    if (!patientId) {
+      return res.status(400).json({ message: "Patient ID is required" });
     }
 
-    // Create a unified map based on unique registration_date
-    const recordMap = new Map();
+    // Fetch all related data in parallel
+    const [assessments, subjectives, objectives, plans,bloodtest,urinetest] = await Promise.all([
+      Assessment.find({ patient_id: patientId }).sort({ registration_date: -1 }).lean(),
+      Subjective.find({ patient_id: patientId }).sort({ createdAt: -1 }).lean(),
+      Objective.find({ patient_id: patientId }).sort({ createdAt: -1 }).lean(),
+      Plan.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
+      BloodTest.find({patient_id:patientId}).sort({ createdAt: -1 }).lean(),
+      UrineTest.find({patient_id:patientId}).sort({ createdAt: -1 }).lean(),
+    ]);
 
-    const addToMap = (record, type) => {
-      // const key = record.registration_date.toISOString();
+
+
+   
+
+
+    // Structure the response by tabs
+    res.status(200).json({
+      patientId,
+      history: assessments.map((a) => ({
+        id: a._id,
+        date: a.registration_date,
+        working_diagnosis: a.working_diagnosis,
+        differential_diagnosis: a.differential_diagnosis,
+        recorded_by: a.username,
+      })),
+      soapNotes: assessments.map((a, i) => ({
+        id: a._id,
+        date: a.registration_date,
+        doctor: a.username,
+        subjective: subjectives[i]?.note || "",
+        objective: objectives[i] || {},
+        assessment: a.working_diagnosis,
+        plan: plans[i] || {},
+      })),
      
-            // Ensure registration_date is a Date object
-            const registrationDate = record.registration_date instanceof Date 
-            ? record.registration_date 
-            : new Date(record.registration_date);
-          
-          // Use timestamp as key to avoid timezone issues
-          const key = registrationDate.getTime();
+        bloodhistory: bloodtest.map((a) => ({
+          id: a._id,
+          patient: a.patient_id,
+          date: a.date,
+          hemoglobin: a.hemoglobin,
+          hemoglobin_notes: a.hemoglobin_notes,
+          wbc_count: a.wbc_count,
+          wbc_flag: a.wbc_flag,
+          recorded_by: a.username,
+        })),
+        urinetest: urinetest.map((a) => ({
+          id: a._id,
+          patient: a.patient_id,
+          date: a.date,
+          appearance: a.appearance,
+          hemoglobin_notes: a.hemoglobin_notes,
+          color: a.color,
+          wbc_flag: a.wbc_flag,
+          recorded_by: a.username,
+        })),
 
-
-
-      if (!recordMap.has(key)) {
-        recordMap.set(key, {
-          date: record.registration_date,
-          patient_id: record.patient_id,
-          patient_name: record.patient_name || "Unknown",
-          doctor: record.username || "Unknown",
-          subjective: "No subjective data",
-          objective: {
-            physical_examination: "Not recorded",
-            cardiovascular: "Not recorded",
-            heent: "Not recorded",
-            respiratory: "Not recorded",
-            vitals: {}
-          },
-          assessment: "No assessment recorded",
-          plan: {
-            medications: [],
-            tests: [],
-            patient_education: "No instructions",
-            follow_up: "No follow-up planned",
-            status: "pending"
-          }
-        });
-      }
-
-      const current = recordMap.get(key);
-
-      if (type === "subjective") {
-        current.subjective = record.complaint || current.subjective;
-      } else if (type === "objective") {
-        current.objective = {
-          physical_examination: record.physical_examination || current.objective.physical_examination,
-          cardiovascular: record.cardiovascular || current.objective.cardiovascular,
-          heent: record.heent || current.objective.heent,
-          respiratory: record.respiratory || current.objective.respiratory,
-          vitals: record.vitals || current.objective.vitals,
-        };
-        current.doctor = record.username || current.doctor;
-        current.patient_name = record.patient_name || current.patient_name;
-      } else if (type === "assessment") {
-        current.assessment = record.diagnosis || current.assessment;
-      } else if (type === "plan") {
-        current.plan = {
-          medications: record.medications || [],
-          tests: record.tests || [],
-          patient_education: record.patient_education || "No instructions",
-          follow_up: record.follow_up || "No follow-up planned",
-          status: record.status || "pending",
-        };
-      }
-
-      recordMap.set(key, current);
-    };
-
-    subjectives.forEach((rec) => addToMap(rec, "subjective"));
-    objectives.forEach((rec) => addToMap(rec, "objective"));
-    assessments.forEach((rec) => addToMap(rec, "assessment"));
-    plans.forEach((rec) => addToMap(rec, "plan"));
-
-    // Convert map to sorted array
-    const unifiedNotes = Array.from(recordMap.values()).sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
-    );
-
-    res.status(200).json(unifiedNotes);
-  } catch (err) {
-    console.error("Error fetching SOAP notes:", err);
-    res.status(500).json({
-      error: "Failed to fetch medical records",
-      details: err.message,
+       
+      prescriptions: plans.map((p) => ({
+        id: p.patient,
+        date: p.registration_date,
+        patient_name :p.patient_name,
+        recorded_by: p.username,
+        medications: p.medications?.map((m) => ({
+          name: m.medication_name,
+          dose: m.dose,
+          frequency: m.frequency,
+          status: m.dispense_status,
+        })) || [],
+      })),
+      
+      
+      imaging: [], // <-- imaging model later
     });
+  } catch (error) {
+    console.error("Error fetching patient medical history:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+
+};
+
+const getTodayAppointments = async (req, res) => {
+  try {
+    // Get date in YYYY-MM-DD format
+    const dateStr = req.query.date || new Date().toISOString().split("T")[0];
+
+    // Direct match for string dates
+    const appointments = await Appointment.find({
+      appointment_date: dateStr,
+    });
+
+    res.json(appointments || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
+const searchMedication = async (req, res) => {
+  try {
+    const { query, category } = req.query;
 
-const getTodayAppointments = async (req, res) => {
+    console.log("Search request received:", { query, category });
 
-    try {
-      // Get date in YYYY-MM-DD format
-      const dateStr = req.query.date || new Date().toISOString().split('T')[0];
-      
-      // Direct match for string dates
-      const appointments = await Appointment.find({
-        appointment_date: dateStr
-      });
-  
-      res.json(appointments || []);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    // Build search filter correctly
+    let searchFilter = {};
+
+    // Only apply quantity filter if we're not searching (shows all available)
+    // OR apply it always to only show available items
+    searchFilter.quantity = { $gt: 0 }; // Show only items with stock
+
+    if (query && query.trim() !== "") {
+      // FIX: Proper regex search - escape special characters
+      searchFilter.name = {
+        $regex: query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        $options: "i",
+      };
     }
-    
+
+    if (category && category !== "all" && category !== "") {
+      searchFilter.category = category;
+    }
+
+    console.log("Final search filter:", JSON.stringify(searchFilter, null, 2));
+
+    const medications = await Inventory.find(searchFilter)
+      .select("name quantity unit price isCoveredByInsurance category")
+      .sort({ name: 1 })
+      .limit(20); // Increased limit for better testing
+
+    console.log("Found medications:", medications.length);
+
+    res.json(medications);
+  } catch (err) {
+    console.error("Search error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 };
 
+// Update addInventory to handle category
 const addInventory = async (req, res) => {
   try {
-    const { name, quantity, unit,price ,isCoveredByInsurance, supplier,expiryDate } = req.body;
-
-    const med = new Inventory({
+    const {
       name,
       quantity,
       unit,
@@ -421,24 +708,63 @@ const addInventory = async (req, res) => {
       isCoveredByInsurance,
       supplier,
       expiryDate,
+      category,
+    } = req.body;
+    console.log("Received data:", req.body); // 👈 Add this for debugging
+    const med = new Inventory({
+      name: name.toUpperCase(), // Standardize
+      quantity,
+      unit,
+      price,
+      isCoveredByInsurance: isCoveredByInsurance === "Yes",
+      supplier,
+      expiryDate,
+      category,
     });
 
     await med.save();
     res.status(201).json({ message: "Medication added", med });
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: err.message });
   }
-}
+};
 
+// Backend route for medication search
+// router.get('/api/inventory/search', async (req, res) => {
+//   try {
+//     const { query, category } = req.query;
+
+//     let searchFilter = {
+//       quantity: { $gt: 0 } // Only show available medications
+//     };
+
+//     if (query) {
+//       searchFilter.name = { $regex: query, $options: 'i' };
+//     }
+
+//     if (category) {
+//       searchFilter.category = category;
+//     }
+
+//     const medications = await Inventory.find(searchFilter)
+//       .select('name quantity unit price isCoveredByInsurance category')
+//       .sort({ name: 1 })
+//       .limit(10);
+
+//     res.json(medications);
+//   } catch (err) {
+//     res.status(500).json({ error: "Server error" });
+//   }
+// });
 const allInventory = async (req, res) => {
-   try {
-     const allInvent = await Inventory.find();
-      console.log(allInvent)
-     res.json(allInvent);
-   } catch (error) {
-     res.status(500).json({error : error.message})
-   }
-}
+  try {
+    const allInvent = await Inventory.find();
+    console.log(allInvent);
+    res.json(allInvent);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
 const getPatientMed = async (req, res) => {
   try {
@@ -447,76 +773,162 @@ const getPatientMed = async (req, res) => {
     if (!patientId) {
       return res.status(400).json({ message: "Patient ID is required" });
     }
-
-    // Get today's start and end timestamps
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-
-    // Find plans for this patient created today
     const plans = await Plan.find({
-      patient_id: patientId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      patient: patientId,
+      status:"pending"
+    
     });
     const asse = await Assessment.find({
-      patient_id : patientId,
-      createdAt : {$gte : startOfDay, $lte : endOfDay}
-    })
-
-    if (!plans || plans.length === 0 && (!asse || asse.length === 0)) {
-      return res.status(404).json({ message: "No plans or diagnosis found for this patient today" });
-    }
-    
-    res.status(200).json({
-      plans: plans || [],
-      assessment: asse || []
+      patient_id: patientId,
+ 
     });
 
+    if (!plans || (plans.length === 0 && (!asse || asse.length === 0))) {
+      return res
+        .status(404)
+        .json({
+          message: "No plans or diagnosis found for this patient today",
+        });
+    }
+
+    res.status(200).json({
+      plans: plans || [],
+      assessment: asse || [],
+    });
   } catch (error) {
     console.error("Error fetching today’s patient plans:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
+};
 
+const getPatientLabHistory = async (req,res) => {
+  try {
+    const { id } = req.params;
+ 
+
+    if (!id) {
+      return res.status(400).json({ message: "Patient ID is required" });
+    }
+
+    // Fetch all related data in parallel
+    const [bloodtests, urinetests, quicktests,] = await Promise.all([
+      BloodTest.find({ patient_id: id }).sort({ registration_date: -1 }).lean(),
+      UrineTest.find({ patient_id: id }).sort({ createdAt: -1 }).lean(),
+      QuickTest.find({ patient_id: id }).sort({ createdAt: -1 }).lean(),
+   
+    ]);
+
+   
+
+   
+
+
+    // Structure the response by tabs
+
+    
+    res.status(200).json({
+      id,
+      bloodhistory: bloodtests.map((a) => ({
+        id: a._id,
+        patient: a.patient_id,
+        date: a.date,
+        hemoglobin: a.hemoglobin,
+        hemoglobin_notes: a.hemoglobin_notes,
+        wbc_count: a.wbc_count,
+        wbc_flag: a.wbc_flag,
+        recorded_by: a.username,
+      })),
+      urinetest: urinetests.map((a) => ({
+        id: a._id,
+        patient: a.patient_id,
+        date: a.date,
+        appearance: a.appearance,
+        hemoglobin_notes: a.hemoglobin_notes,
+        color: a.color,
+        wbc_flag: a.wbc_flag,
+        recorded_by: a.username,
+      })),
+
+    });
+ 
+
+ 
+
+
+
+
+      // soapNotes: assessments.map((a, i) => ({
+      //   id: a._id,
+      //   date: a.registration_date,
+      //   doctor: a.username,
+      //   subjective: subjectives[i]?.note || "",
+      //   objective: objectives[i] || {},
+      //   assessment: a.working_diagnosis,
+      //   plan: plans[i] || {},
+      // })),
+      // labs: [], // <-- you’ll plug in Lab model later
+      // prescriptions: plans.map((p) => ({
+      //   id: p.patient,
+      //   date: p.registration_date,
+      //   patient_name :p.patient_name,
+      //   recorded_by: p.username,
+      //   medications: p.medications?.map((m) => ({
+      //     name: m.medication_name,
+      //     dose: m.dose,
+      //     frequency: m.frequency,
+      //     status: m.dispense_status,
+      //   })) || [],
+      // })),
+      
+   
+
+  } catch (error) {
+    console.error("Error fetching patient medical history:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 }
 
-const getOPDSession = async (req, res) => {
+const getOPDSessionView = async (req, res) => {
   try {
     const { patientId } = req.params;
-
     if (!patientId) {
       return res.status(400).json({ message: "Patient ID is required" });
     }
 
-    // Get today's start and end timestamps
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const patientVitals = await OPDWard.findById(patientId).populate("session");
 
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    if (!patientVitals) {
+      return res.status(404).json({ message: "Patient not found" });
+    }
 
-    // Find plans for this patient created today
-    const plans = await OPDWard.find({
-      patient_id: patientId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
-    });
- 
-    
-    res.status(200).json({
-      plans:plans
-    });
-    console.log(plans)
+    res.status(200).json(patientVitals);
 
   } catch (error) {
-    console.error("Error fetching today’s patient plans:", error.message);
+    console.error("Error fetching patient vitals:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
+};
 
+const getAllPatientRecordWard = async (req, res) => {
+   try {
+    const respose = await Ward.find().sort({createdAt : - 1});
+    res.status(200).json(respose);
+   } catch (error) {
+     console.log(error)
+   }
 }
 
+
+
 export {
-  getOPDSession,
+  getAllPatientRecordWard,
+  unpaidMedications,
+  getPatientLabHistory,
+  processMedicationPayment,
+  searchMedication,
+  markAsDispensed,
+  getPendingPrescriptions,
+  getOPDSessionView,
   getPatientMed,
   addInventory,
   allInventory,
@@ -536,7 +948,6 @@ export {
   updatePatient,
   editPatient,
   getAllEmployees,
-  getDoctors,
   createAppointment,
   getPatients,
   getAppointmens,

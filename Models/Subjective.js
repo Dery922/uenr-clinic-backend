@@ -1,12 +1,17 @@
 import mongoose from "mongoose"
 
 const SubjectiveSchema = mongoose.Schema({
-    patient_id : {
-        type: String
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PatientSession",
+        required: true,
+      },
+      
+    patient : {
+        type: String,
+        required : true,
      },
-     patient_name : {
-        type : String
-     },
+
      registration_date : {
          type : Date,
          required : [true, "date of entry is needed "]
@@ -31,14 +36,6 @@ const SubjectiveSchema = mongoose.Schema({
         required : true,
     },
 
-         search : [
-             {
-                 patient : {
-                     type : mongoose.Schema.ObjectId,
-                     ref : "Patient"
-                 }
-             }
-         ]
 }, {
     timestamps : true
 });

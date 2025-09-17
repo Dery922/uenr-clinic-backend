@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
 
 const BloodTestSchema = new mongoose.Schema({
+  session: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "PatientSession",
+    required: true,
+  },
+  
    patient_id : {
      type : String,
    },

@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
 
 const VisitSchema = new mongoose.Schema({
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Session",
+        required: true,
+      },
+      
     patient_id : {
         type : mongoose.Schema.Types.ObjectId,
         ref : 'Patient',

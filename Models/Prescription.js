@@ -1,55 +1,27 @@
+// models/Prescription.js
 import mongoose from "mongoose";
 
-// Subdocument schema for each prescribed drug
-const DrugSchema = new mongoose.Schema({
-  name: {
-    type: String,
+const prescriptionSchema = new mongoose.Schema({
+  session: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "PatientSession",
     required: true,
   },
-  dosage: {
-    type: String,
-    required: true,
-  },
-  frequency: {
-    type: String,
-    required: true,
-  },
-  duration: {
-    type: String,
-    required: true,
-  }
-}, { _id: false }); // prevent auto-creating _id for each subdocument
+  
+  doctor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  patient: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
+  medications: [
+    {
+      name: { type: String, required: true }, // e.g., "Amoxicillin"
+      dosage: { type: String, required: true }, // e.g., "500mg"
+      frequency: { type: String, required: true }, // e.g., "3 times a day"
+      duration: { type: String, required: true }, // e.g., "7 days"
+    }
+  ],
+  diagnosis: { type: String, required: true },
+  status: { type: String, enum: ["pending", "dispensed"], default: "pending" },
+  dispensedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  notes: String
+}, { timestamps: true });
 
-// Main prescription schema
-const PrescriptionSchema = new mongoose.Schema({
-  patient_id: {
-    type: String,
-    required: true,
-  },
-  patient_name: {
-    type: String,
-    required: true,
-  },
-  prescribed_by: {
-    type: String,
-    required: true,
-  },
-  date: {
-    type: Date,
-    default: Date.now,
-  },
-  drugs: {
-    type: [DrugSchema],
-    required: true,
-  },
-  status: {
-    type: String,
-    enum: ["pending", "dispensed"],
-    default: "pending",
-  }
-}, {
-  timestamps: true
-});
-
-const Prescription = mongoose.model("Prescription", PrescriptionSchema);
-export default Prescription;
+export default mongoose.model("Prescription", prescriptionSchema);

@@ -1,12 +1,16 @@
 import mongoose from "mongoose"
 
 const AssessmentSchema = mongoose.Schema({
+    session: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PatientSession",
+        required: true,
+      },
+      
     patient_id : {
         type: String
      },
-     patient_name : {
-       type : String
-     },
+
      registration_date : {
          type : Date,
          required : [true, "date of entry is needed "]
@@ -28,15 +32,6 @@ const AssessmentSchema = mongoose.Schema({
         type : String,
         required : true,
     },
-
-         search : [
-             {
-                 patient : {
-                     type : mongoose.Schema.ObjectId,
-                     ref : "Patient"
-                 }
-             }
-         ]
 }, {
     timestamps : true
 });

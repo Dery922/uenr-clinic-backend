@@ -31,14 +31,10 @@ const upload = multer({
     cb(null, true);
   },
 });
-
-
-
 const getlogin = async (req, res) => {
     try {
         const {username, password} = req.body;
         const user = await User.findOne({username});
-
         if(!user){
             return res.status(400).json({message : "User is not connected to an account"});
         }
@@ -59,6 +55,7 @@ const getlogin = async (req, res) => {
           email : user.email,
           phone : user.phone,
           address : user.address,
+          profile_picture : user.profile_picture || "",
           role : user.role,
           token : token,
         }
