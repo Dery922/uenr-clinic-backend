@@ -46,20 +46,36 @@ const getlogin = async (req, res) => {
         }
         const token = generateToken({id:user._id.toString()}, "7d");
 
-        res.send(
-          {
-          id: user._id,
-          username : user.username,
-          first_name : user.first_name,
-          last_name : user.last_name,
-          email : user.email,
-          phone : user.phone,
-          address : user.address,
-          profile_picture : user.profile_picture || "",
-          role : user.role,
-          token : token,
-        }
-      )
+      //   res.send(
+      //     {
+      //     id: user._id,
+      //     username : user.username,
+      //     first_name : user.first_name,
+      //     last_name : user.last_name,
+      //     email : user.email,
+      //     phone : user.phone,
+      //     address : user.address,
+      //     profile_picture : user.profile_picture || "",
+      //     role : user.role,
+      //     token : token,
+      //   }
+      // )
+
+      res.json({
+  user: {
+    id: user._id,
+    username: user.username,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    email: user.email,
+    phone: user.phone,
+    address: user.address,
+    profile_picture: user.profile_picture || "",
+    role: user.role,
+  },
+  token,
+});
+
 
     } catch (error) {
         res.status(500).json({message : error.message });
