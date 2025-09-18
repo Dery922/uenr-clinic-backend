@@ -38,6 +38,9 @@ const getlogin = async (req, res) => {
         if(!user){
             return res.status(400).json({message : "User is not connected to an account"});
         }
+      console.log("Entered password:", password);
+console.log("Stored hash:", user.password);
+
         const check = await bcrypt.compare(password, user.password);
         if(!check){
             return res.status(400).json({
