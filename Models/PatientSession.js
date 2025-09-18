@@ -11,10 +11,14 @@ const patientSessionSchema = new mongoose.Schema({
     type : String,
     required : true,
   },
+  patient_name : {
+    type : String,
+    default : null,
+  },
   doctor: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // assuming doctors are in the User collection
-    required: true,
+    ref: "User", 
+ 
   },
   reasonForVisit: { type: String },
   admitted: { type: Boolean, default: false },

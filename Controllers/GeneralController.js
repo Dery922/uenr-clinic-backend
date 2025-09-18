@@ -17,6 +17,8 @@ import Notification from "../Models/Notification.js";
 import { io } from "../server.js";
 import UrineTest from "../Models/UrineTest.js";
 import Ward from "../Models/Ward.js";
+
+
 import QuickTest from "../Models/QuickTest.js";
 const getOnlineEmployees = async (req, res) => {
   try {
@@ -551,6 +553,74 @@ const createDoctorPlan = async (req, res) => {
   }
 };
 
+
+
+ const processPayment = async (req, res) => {
+  try {
+    const {
+      bills, // array of { planId, drugIndex, amount_paid }
+      total_amount,
+      payment_method,
+      transaction_id,
+      cashier_username,
+    } = req.body;
+
+    if (!bills || bills.length === 0) {
+      return res.status(400).json({ message: "No bills provided" });
+    }
+
+    const results = [];
+
+    for (const bill of bills) {
+      const plan = await Plan.findById(bill.planId);
+      if (!plan) continue;
+
+      const drug = plan.medications[bill.drugIndex];
+      if (!drug) continue;
+
+      // Update payment info in Plan.medications
+      drug.paid_amount += bill.amount_paid;
+      drug.payment_status =
+        drug.paid_amount >= drug.total_amount ? "paid" : "partial";
+      drug.payment_date = new Date();
+      drug.payment_method = payment_method;
+      drug.transaction_id = transaction_id;
+
+      await plan.save();
+
+      // Create a financial record entry
+      const record = await FinancialRecord.create({
+        session: plan.session,
+        patient_id: plan.patient,
+        patient_name: plan.patient_name,
+        plan_id: plan._id,
+        medication_index: bill.drugIndex,
+        medication_name: drug.medication_name,
+        amount: drug.total_amount,
+        covered_by_insurance: drug.covered_by_insurance,
+        payment_status: drug.payment_status,
+        paid_amount: drug.paid_amount,
+        balance: Math.max(drug.total_amount - drug.paid_amount, 0),
+        payment_date: new Date(),
+        payment_method,
+        transaction_id,
+        created_by: cashier_username,
+      });
+
+      results.push(record);
+    }
+
+    res.status(200).json({
+      message: "Payment processed successfully",
+      total_amount,
+      records: results,
+    });
+  } catch (error) {
+    console.error("Payment error:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 const getSOAPNotes = async (req, res) => {
 
   try {
@@ -921,6 +991,7 @@ const getAllPatientRecordWard = async (req, res) => {
 
 
 export {
+  processPayment,
   getAllPatientRecordWard,
   unpaidMedications,
   getPatientLabHistory,

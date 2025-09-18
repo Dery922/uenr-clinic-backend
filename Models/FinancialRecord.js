@@ -8,8 +8,8 @@ const FinancialRecordSchema = new mongoose.Schema(
       ref: "PatientSession",
       required: true,
     },
-    patient_id: { type: String, required: true },
-    patient_name: { type: String, required: true },
+    patient_id: { type: String},
+    patient_name: { type: String },
     plan_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Plan",
@@ -31,7 +31,7 @@ const FinancialRecordSchema = new mongoose.Schema(
     transaction_id: { type: String },
     created_by: { type: String }, // Cashier username
     notes: { type: String },
-    department: { type: String, default: "pharmacy" },
+
   },
   { timestamps: true }
 );

@@ -249,11 +249,13 @@ const createPatientQuickTestRecord = async (req, res) => {
 };
 
 const Session = async (req, res) => {
+  console.log(req.body)
   try {
     const session = await PatientSession.create({
       
       patient: req.body.patientId,
       patient_id : req.body.patient_id,
+      patient_name : req.body.patient_name,
       doctor: req.body.doctorId,
       reasonForVisit: req.body.visitType, // map visitType → reasonForVisit
       admitted: req.body.admitted || false,

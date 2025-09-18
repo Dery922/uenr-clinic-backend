@@ -104,4 +104,7 @@ const getGenderDistribution = async (req, res) => {
       }
 }
 
-export {getGenderDistribution,allUsers, allPatients, allStudentsPatients, allOutPatients, getMonthlyPatientStats}
+export {getGenderDistribution,
+   allUsers, 
+   allPatients, allStudentsPatients, 
+   allOutPatients, getMonthlyPatientStats}

@@ -21,7 +21,8 @@ const __dirname = path.dirname(__filename);
 // ✅ Setup Socket.IO with correct CORS
 export const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: ["http://localhost:3000",
+    "https://uenr-clinic-frontend.onrender.com"],
     methods: ["GET", "POST"],
     credentials: true,
   },

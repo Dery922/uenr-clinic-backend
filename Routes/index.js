@@ -32,7 +32,8 @@ import {
   processMedicationPayment,
   getPatientLabHistory,
   unpaidMedications,
-  getAllPatientRecordWard} from "../Controllers/GeneralController.js";
+  getAllPatientRecordWard,
+  processPayment} from "../Controllers/GeneralController.js";
 import upload from "./upload.js";
 import Imaging from "../Models/Imaging.js";
 import { register, RegisterStudent, StudentLogin } from "../Controllers/AppController.js";
@@ -88,6 +89,8 @@ router.post("/api/student-login", StudentLogin);
 //inventory
 router.post("/api/add-inventory", addInventory);
 router.get("/api/all-inventory", allInventory);
+
+router.post("/finance/process-payment", processPayment)
 
 
 router.post("/api/doctor-subjective",DoctorSubjective);
