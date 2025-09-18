@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 
 const PORT = process.env.PORT || 8080; // Added default port
 const mongoURL = process.env.DATABASETECH || "mongodb://localhost:27017"; // Added env variable
+console.log("🔍 Mongo URL being used:", process.env.DATABASETECH);
+
 
 
 const connectDB = async () => {
