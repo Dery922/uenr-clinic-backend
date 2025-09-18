@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 8080; // Added default port
 console.log("🔍 Mongo URL being used:", process.env.DATABASETECH);
 
 
-const mongoURL = process.env.MONGO_URL || "mongodb://localhost:27017"; // Added env variable
+const mongoURL = process.env.DATABASETECH  // Added env variable
 
 
 
